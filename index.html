@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#F05798">
+<meta name="robots" content="noindex">
+<title>AI旅タイプ診断｜Lumia AI SCHOOL</title>
+<style>
+:root{
+  --pink:#F05798;
+  --pink-deep:#E23D80;
+  --pink-glow:#FF8FBE;
+  --pink-pale:#FDEDF4;
+  --gold:#D8BC82;
+  --gold-deep:#C9A96A;
+  --paper:#FBF7F0;
+  --ink:#3A2A31;
+  --note:#8A7078;
+  --line:rgba(226,61,128,.14);
+  --mincho:"Hiragino Mincho ProN","Yu Mincho",serif;
+  --gothic:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --serif-en:Georgia,"Times New Roman",serif;
+}
+*{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ height:100%; }
+body{
+  font-family:var(--gothic);
+  background:var(--paper); color:var(--ink);
+  line-height:1.85; font-size:16px;
+  overflow-x:hidden;
+}
+/* 紙のような質感 */
+body::after{ content:""; position:fixed; inset:0; pointer-events:none; z-index:99; opacity:.045;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.stage{ max-width:480px; margin:0 auto; min-height:100dvh; display:flex; flex-direction:column; }
+
+/* ===== 共通パーツ ===== */
+.screen{ display:none; flex:1; flex-direction:column; padding:26px 22px 40px; }
+.screen.active{ display:flex; animation:fadeUp .5s ease both; }
+@keyframes fadeUp{ from{ opacity:0; transform:translateY(16px);} to{ opacity:1; transform:none;} }
+@keyframes pop{ 0%{ transform:scale(.9); opacity:0;} 60%{ transform:scale(1.05);} 100%{ transform:scale(1); opacity:1;} }
+@keyframes floaty{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-7px);} }
+@keyframes flyover{ 0%{ transform:translateX(-46vw) translateY(8px) rotate(8deg); opacity:0;}
+  12%{ opacity:1;} 88%{ opacity:1;}
+  100%{ transform:translateX(46vw) translateY(-14px) rotate(8deg); opacity:0;} }
+
+.eyebrow{ font-family:var(--serif-en); font-style:italic; color:var(--gold-deep);
+  font-size:12.5px; letter-spacing:.26em; }
+.brand-min{ font-family:var(--serif-en); font-style:italic; color:var(--gold-deep);
+  letter-spacing:.24em; font-size:13px; }
+
+.btn{
+  display:block; width:100%; border:none; cursor:pointer; text-align:center;
+  font-family:var(--gothic); font-weight:700; font-size:16.5px; color:#fff;
+  background:linear-gradient(135deg,#F273A8 0%,#E85590 55%,#F05798 100%);
+  padding:17px 20px; border-radius:999px; letter-spacing:.04em; line-height:1.65;
+  box-shadow:0 14px 30px -8px rgba(226,61,128,.45), inset 0 1px 0 rgba(255,255,255,.35);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.btn:active{ transform:scale(.97); box-shadow:0 6px 16px rgba(226,61,128,.3); }
+.btn.gold{ background:linear-gradient(135deg,#DEC48E 0%,#C9A96A 100%);
+  box-shadow:0 14px 30px -8px rgba(201,169,106,.5), inset 0 1px 0 rgba(255,255,255,.4); }
+.btn-sub{ display:block; margin:20px auto 0; background:none; border:none; cursor:pointer;
+  color:var(--note); font-size:13px; text-decoration:underline; text-underline-offset:3px; font-family:var(--gothic); }
+
+/* ===== スタート画面 ===== */
+#s-start{ padding:0 0 34px; }
+.hero{
+  position:relative; text-align:center; color:#fff; overflow:hidden;
+  background:
+    radial-gradient(120% 90% at 18% 0%, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 42%),
+    linear-gradient(160deg,#F273A8 0%,#E85590 45%,#F05798 100%);
+  padding:42px 24px 92px;
+}
+.hero .ray{ position:absolute; pointer-events:none; left:-14%; top:-32%;
+  width:74%; height:130%; transform:rotate(-24deg); transform-origin:top left;
+  background:linear-gradient(105deg,
+    rgba(255,255,255,0) 12%, rgba(255,255,255,.08) 22%, rgba(255,255,255,0) 30%,
+    rgba(255,255,255,.05) 40%, rgba(255,255,255,0) 50%,
+    rgba(255,255,255,.04) 60%, rgba(255,255,255,0) 70%); }
+.halo{ position:absolute; border-radius:50%; pointer-events:none; }
+.hero .ha{ width:300px; height:300px; right:-100px; top:-120px;
+  background:radial-gradient(circle at 45% 45%, rgba(216,188,130,.26), rgba(216,188,130,0) 68%); }
+.hero .hb{ width:240px; height:240px; left:-90px; bottom:-60px;
+  background:radial-gradient(circle at 55% 40%, rgba(255,143,190,.5), rgba(255,143,190,0) 70%); }
+.hero .cloud{ position:absolute; bottom:-24px; width:220px; height:80px; border-radius:50%;
+  background:radial-gradient(ellipse at center, rgba(251,247,240,.9), rgba(251,247,240,0) 70%); filter:blur(2px); }
+.hero .c1{ left:-60px; } .hero .c2{ right:-70px; bottom:-34px; width:260px; }
+.hero-in{ position:relative; z-index:2; }
+.hero .lumia{ font-family:var(--serif-en); font-style:italic; letter-spacing:.3em;
+  font-size:15px; color:rgba(255,255,255,.95); }
+.hero .lumia small{ display:block; font-family:var(--gothic); font-style:normal;
+  font-size:10.5px; letter-spacing:.22em; color:rgba(255,255,255,.72); margin-top:4px; }
+.hero .rule{ width:52px; height:1px; background:rgba(216,188,130,.7); margin:20px auto; }
+.hero .eyebrow-w{ font-family:var(--serif-en); font-style:italic; font-size:12px;
+  letter-spacing:.3em; color:#FBE3C9; }
+.hero h1{ font-family:var(--mincho); font-weight:600; font-size:26.5px;
+  letter-spacing:.05em; line-height:1.65; margin-top:12px; }
+.hero h1 .kagi{ color:#FFE4F0; }
+/* 飛行ルート */
+.route{ margin:20px auto 0; width:min(300px,80%); position:relative; }
+.route svg{ display:block; width:100%; height:auto; overflow:visible; }
+.route .plane{ position:absolute; font-size:22px; left:50%; top:-4px;
+  transform:translateX(-50%); animation:floaty 3s ease-in-out infinite; }
+.hero .free{ display:inline-block; margin-top:20px; background:#fff; color:var(--pink-deep);
+  font-family:var(--mincho); font-weight:700; font-size:14.5px; letter-spacing:.1em;
+  padding:9px 26px; border-radius:999px; border:1px solid rgba(216,188,130,.95);
+  box-shadow:0 10px 26px rgba(0,0,0,.16); }
+
+/* 搭乗券カード */
+.ticket-wrap{ padding:0 22px; margin-top:-58px; position:relative; z-index:3; }
+.ticket{ position:relative; background:#fff; border-radius:18px;
+  border:1px solid rgba(216,188,130,.5);
+  box-shadow:0 28px 56px -30px rgba(226,61,128,.4); overflow:hidden; }
+.ticket .t-top{ padding:20px 22px 16px; text-align:center; }
+.ticket .t-route{ display:flex; align-items:center; justify-content:center; gap:12px;
+  font-family:var(--serif-en); font-size:11px; letter-spacing:.22em; color:var(--gold-deep); }
+.ticket .t-route b{ font-family:var(--gothic); font-size:12.5px; letter-spacing:.1em; color:var(--ink); font-weight:700; }
+.ticket .t-main{ font-family:var(--mincho); font-weight:600; font-size:17px;
+  letter-spacing:.06em; color:var(--pink-deep); margin-top:10px; }
+.ticket .t-sub{ font-size:14px; margin-top:8px; line-height:1.9; }
+.ticket .t-sub b{ color:var(--pink-deep); }
+/* 切り取り線 */
+.ticket .perf{ position:relative; height:0; border-top:2px dashed rgba(216,188,130,.7); margin:0 14px; }
+.ticket .perf::before,.ticket .perf::after{ content:""; position:absolute; top:-11px; width:22px; height:22px;
+  border-radius:50%; background:var(--paper); border:1px solid rgba(216,188,130,.5); }
+.ticket .perf::before{ left:-26px; } .ticket .perf::after{ right:-26px; }
+.ticket .t-btm{ padding:16px 22px 18px; text-align:center; background:linear-gradient(180deg,#fff, #FDF6F9); }
+.ticket .t-plus{ font-family:var(--serif-en); font-style:italic; font-size:11.5px;
+  letter-spacing:.24em; color:var(--gold-deep); }
+.ticket .t-plan{ font-size:14px; margin-top:6px; line-height:1.9; }
+.ticket .t-plan b{ color:var(--pink-deep); display:inline-block; }
+.start-foot{ margin-top:auto; padding:30px 22px 0; }
+.start-foot .micro{ text-align:center; color:var(--note); font-size:12px; margin-top:12px; letter-spacing:.06em; }
+
+/* ===== 質問画面 ===== */
+.q-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+.q-count{ font-family:var(--serif-en); font-style:italic; color:var(--gold-deep);
+  font-size:14px; letter-spacing:.14em; }
+.q-track{ position:relative; height:26px; margin:8px 0 18px; }
+.q-track .rail{ position:absolute; left:0; right:0; top:14px; border-top:2px dashed rgba(216,61,128,.22); }
+.q-track .fill{ position:absolute; left:0; top:14px; height:2px; width:0;
+  background:linear-gradient(90deg,var(--pink-glow),var(--pink-deep)); transition:width .45s ease; }
+.q-track .qplane{ position:absolute; top:0; left:0; font-size:19px;
+  transform:translateX(-50%); transition:left .45s ease; }
+.q-num{ font-family:var(--serif-en); font-style:italic; font-size:44px; color:rgba(216,188,130,.4);
+  line-height:1; }
+.q-text{ font-family:var(--mincho); font-weight:600; font-size:20.5px;
+  line-height:1.7; letter-spacing:.03em; margin-top:4px; min-height:2.6em; }
+.opts{ margin-top:20px; display:flex; flex-direction:column; gap:12px; }
+.opt{
+  display:flex; align-items:center; gap:13px; width:100%; text-align:left;
+  background:#fff; border:1.5px solid var(--line); border-radius:16px;
+  padding:13px 16px; font-family:var(--gothic); font-size:15px; color:var(--ink);
+  cursor:pointer; line-height:1.6;
+  box-shadow:0 10px 24px -18px rgba(226,61,128,.35);
+  transition:transform .12s ease, border-color .12s ease, background .12s ease;
+}
+.opt .oi{ flex:0 0 auto; width:40px; height:40px; border-radius:50%;
+  background:var(--pink-pale); display:flex; align-items:center; justify-content:center; font-size:19px; }
+.opt:active{ transform:scale(.98); }
+.opt.picked{ border-color:var(--pink-deep); background:var(--pink-pale); }
+.opt.picked .oi{ background:#fff; }
+
+/* ===== 分析中／生成中 ===== */
+.loading{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+.sky{ position:relative; width:100%; height:90px; overflow:hidden; }
+.sky .fly{ position:absolute; left:50%; top:34px; font-size:34px; animation:flyover 3.4s ease-in-out infinite; }
+.sky .arc{ position:absolute; left:10%; right:10%; top:52px; border-top:2px dashed rgba(216,188,130,.55); border-radius:50%; height:40px; }
+.loading h2{ font-family:var(--mincho); font-weight:600; font-size:19px; letter-spacing:.05em; margin-top:10px; line-height:1.8; }
+.loading .sub{ color:var(--note); font-size:13.5px; margin-top:12px; min-height:1.8em; transition:opacity .3s; }
+.dots{ display:flex; gap:8px; margin-top:22px; }
+.dots i{ width:8px; height:8px; border-radius:50%; background:var(--pink-glow); animation:blink 1.2s infinite; }
+.dots i:nth-child(2){ animation-delay:.2s; } .dots i:nth-child(3){ animation-delay:.4s; }
+@keyframes blink{ 0%,100%{ opacity:.25; transform:scale(.85);} 50%{ opacity:1; transform:scale(1);} }
+
+/* ===== 結果画面 ===== */
+.r-head{ text-align:center; }
+.stamp{ width:108px; height:108px; margin:14px auto 0; border-radius:50%;
+  border:2px dashed var(--gold); display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:2px;
+  background:#fff; box-shadow:0 16px 34px -22px rgba(201,169,106,.7);
+  animation:pop .6s ease both; transform:rotate(-4deg); }
+.stamp .se{ font-size:42px; line-height:1; }
+.stamp .st{ font-family:var(--serif-en); font-style:italic; font-size:8.5px;
+  letter-spacing:.2em; color:var(--gold-deep); }
+.r-you{ font-size:13.5px; color:var(--note); margin-top:14px; letter-spacing:.14em; }
+.r-type{ font-family:var(--mincho); font-weight:700; color:var(--pink-deep);
+  font-size:27px; letter-spacing:.03em; line-height:1.5; animation:pop .6s .12s ease both; }
+.r-rule{ width:48px; height:1px; background:var(--gold); margin:16px auto; }
+.r-desc{ background:#fff; border-radius:18px; border:1px solid var(--line);
+  border-top:3px solid var(--gold); padding:18px 20px; font-size:15px; line-height:2;
+  box-shadow:0 16px 36px -26px rgba(226,61,128,.4); text-align:center; }
+.r-best{ margin-top:26px; }
+.r-best h3{ display:flex; align-items:center; gap:14px; justify-content:center;
+  font-family:var(--mincho); font-weight:600; font-size:16px; letter-spacing:.1em; }
+.r-best h3::before,.r-best h3::after{ content:""; flex:0 0 34px; height:1px; background:var(--gold); }
+.best-list{ margin-top:14px; display:flex; flex-direction:column; gap:10px; }
+.best{ display:flex; align-items:center; gap:14px; background:#fff;
+  border:1px solid rgba(216,188,130,.45); border-radius:16px; padding:13px 16px;
+  box-shadow:0 12px 26px -20px rgba(201,169,106,.6); }
+.best .medal{ flex:0 0 44px; width:44px; height:44px; border-radius:50%;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  color:#fff; font-family:var(--serif-en); font-style:italic; line-height:1.15; }
+.best .medal b{ font-size:15px; font-weight:700; } .best .medal small{ font-size:7.5px; letter-spacing:.08em; }
+.best:nth-child(1) .medal{ background:linear-gradient(150deg,#E8CB90,#C9A96A); box-shadow:0 6px 14px -6px rgba(201,169,106,.9); }
+.best:nth-child(2) .medal{ background:linear-gradient(150deg,#D4D4DC,#A9AAB6); }
+.best:nth-child(3) .medal{ background:linear-gradient(150deg,#DDA98A,#C08155); }
+.best .name{ font-family:var(--mincho); font-weight:600; font-size:18px; letter-spacing:.03em; }
+.best .name .flag{ font-size:16px; margin-left:6px; }
+.best .cap{ font-size:12px; color:var(--note); line-height:1.6; }
+.r-cta{ margin-top:28px; }
+.r-cta .btn{ font-size:15px; padding:16px 18px; }
+
+/* ===== プラン入力フォーム ===== */
+.f-head{ text-align:center; }
+.f-title{ font-family:var(--mincho); font-weight:600; font-size:20px; letter-spacing:.04em; margin-top:10px; line-height:1.7; }
+.f-note{ color:var(--note); font-size:13px; margin-top:6px; }
+.fset{ margin-top:26px; }
+.fset label{ display:flex; align-items:baseline; gap:10px; font-weight:700; font-size:14.5px; letter-spacing:.04em; }
+.fset label .no{ font-family:var(--serif-en); font-style:italic; font-size:13px; color:var(--gold-deep); letter-spacing:.06em; }
+.fset label small{ font-weight:400; color:var(--note); font-size:12px; }
+.chips{ display:flex; flex-wrap:wrap; gap:9px; margin-top:11px; }
+.chip{
+  border:1.5px solid rgba(226,61,128,.22); background:#fff; color:var(--ink);
+  border-radius:999px; padding:9px 16px; font-size:14px; font-family:var(--gothic);
+  cursor:pointer; transition:all .12s ease; line-height:1.5;
+}
+.chip.on{ background:var(--pink-deep); border-color:var(--pink-deep); color:#fff; font-weight:700;
+  box-shadow:0 6px 14px -6px rgba(226,61,128,.6); }
+.fset input[type=text]{
+  width:100%; margin-top:10px; border:1.5px solid rgba(226,61,128,.2); border-radius:12px;
+  padding:12px 14px; font-size:16px; font-family:var(--gothic); background:#fff; color:var(--ink);
+}
+.fset input[type=text]::placeholder{ color:#C9B2BB; }
+.f-submit{ margin-top:34px; }
+
+/* ===== プラン表示 ===== */
+.p-head{ text-align:center; }
+.p-head h2{ font-family:var(--mincho); font-weight:700; font-size:22px;
+  color:var(--pink-deep); letter-spacing:.03em; line-height:1.65; margin-top:10px; }
+.p-head .p-lead{ font-size:13.5px; margin-top:8px; color:var(--ink); line-height:1.9; }
+.p-tags{ display:flex; flex-wrap:wrap; gap:7px; justify-content:center; margin-top:14px; }
+.p-tags span{ background:#fff; border:1px solid rgba(226,61,128,.25); color:var(--pink-deep);
+  font-size:12px; padding:5px 13px; border-radius:999px; font-weight:700; }
+.day{ background:#fff; border-radius:18px; border:1px solid var(--line);
+  box-shadow:0 16px 36px -26px rgba(226,61,128,.4); margin-top:18px; overflow:hidden; }
+.day .d-head{ display:flex; align-items:center; gap:12px; padding:13px 18px 11px;
+  border-bottom:1px solid rgba(216,188,130,.35); }
+.day .d-no{ flex:0 0 40px; width:40px; height:40px; border-radius:50%;
+  background:linear-gradient(150deg,#F273A8,#E23D80); color:#fff;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.1; }
+.day .d-no b{ font-family:var(--serif-en); font-size:16px; font-style:italic; }
+.day .d-no small{ font-size:7.5px; letter-spacing:.1em; }
+.day .d-t b{ display:block; font-family:var(--mincho); font-size:16.5px; letter-spacing:.05em; }
+.day .d-t span{ font-size:12px; color:var(--note); }
+.day .d-body{ padding:6px 18px 14px; position:relative; }
+.day .d-body::before{ content:""; position:absolute; left:47px; top:14px; bottom:16px;
+  border-left:2px dashed rgba(216,188,130,.5); }
+.slot{ display:flex; gap:14px; padding:10px 0; position:relative; }
+.slot .t{ flex:0 0 58px; text-align:center; position:relative; z-index:1; }
+.slot .t i{ display:inline-block; font-style:normal; background:var(--pink-pale); color:var(--pink-deep);
+  font-weight:700; font-size:11px; padding:4px 0; width:100%; border-radius:999px; letter-spacing:.04em; }
+.slot .x{ font-size:14px; line-height:1.85; padding-top:2px; }
+.p-points{ background:#fff; border:2px dashed rgba(216,188,130,.65); border-radius:18px;
+  padding:18px 20px 16px; margin-top:18px; }
+.p-points h4{ display:flex; align-items:center; gap:12px; font-family:var(--mincho);
+  font-size:14.5px; color:var(--gold-deep); letter-spacing:.14em; }
+.p-points h4::after{ content:""; flex:1; height:1px; background:rgba(216,188,130,.5); }
+.p-points ul{ list-style:none; margin-top:8px; }
+.p-points li{ font-size:13.5px; line-height:1.95; padding-left:1.4em; position:relative; }
+.p-points li::before{ content:"✦"; position:absolute; left:0; color:var(--gold); }
+.p-save{ text-align:center; margin-top:22px; font-size:13px; color:var(--note); }
+.p-lumia{ margin-top:26px; position:relative; overflow:hidden;
+  background:linear-gradient(160deg,#F273A8,#E85590 55%,#F05798);
+  border-radius:20px; padding:26px 22px; color:#fff; text-align:center; }
+.p-lumia .halo{ width:180px; height:180px; right:-60px; top:-70px;
+  background:radial-gradient(circle at 45% 45%, rgba(216,188,130,.3), rgba(216,188,130,0) 68%); }
+.p-lumia .pl-logo{ position:relative; font-family:var(--serif-en); font-style:italic; letter-spacing:.26em; font-size:14.5px; }
+.p-lumia .pl-logo small{ display:block; font-family:var(--gothic); font-style:normal;
+  font-size:10.5px; letter-spacing:.2em; opacity:.85; margin-top:4px; }
+.p-lumia p{ position:relative; font-size:13.5px; line-height:2.05; margin-top:14px; }
+.p-lumia .pl-fact{ position:relative; margin-top:16px; background:rgba(255,255,255,.15);
+  border:1px solid rgba(255,255,255,.45); border-radius:14px; padding:14px 16px;
+  font-size:13.5px; line-height:2; text-align:center; }
+.p-lumia .pl-fact b{ color:#FFE4F0; }
+.p-lumia .pl-close{ position:relative; font-family:var(--mincho); font-size:14px;
+  letter-spacing:.05em; margin-top:14px; line-height:1.9; }
+.foot{ text-align:center; color:var(--note); font-size:11px; padding:28px 0 10px; letter-spacing:.08em; }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- ①スタート -->
+  <section class="screen active" id="s-start">
+    <div class="hero">
+      <i class="ray"></i><i class="halo ha"></i><i class="halo hb"></i>
+      <i class="cloud c1"></i><i class="cloud c2"></i>
+      <div class="hero-in">
+        <div class="lumia">Lumia AI SCHOOL<small>女性のためのAIスクール</small></div>
+        <div class="rule"></div>
+        <div class="eyebrow-w">AI TRAVEL TYPE</div>
+        <h1>AIが見つける<br><span class="kagi">「わたしにぴったりの旅」</span></h1>
+        <div class="route">
+          <svg viewBox="0 0 300 46" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 40 Q150 -14 294 40" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round"/>
+            <circle cx="6" cy="40" r="3.5" fill="#FBE3C9"/>
+            <circle cx="294" cy="40" r="3.5" fill="#fff"/>
+          </svg>
+          <span class="plane">✈️</span>
+        </div>
+        <div class="free">＼ LINE登録で無料体験 ／</div>
+      </div>
+    </div>
+
+    <div class="ticket-wrap">
+      <div class="ticket">
+        <div class="t-top">
+          <div class="t-route"><span>FROM</span><b>いつもの毎日</b><span style="color:var(--pink-deep);">✈</span><b>わたしの旅</b><span>TO</span></div>
+          <div class="t-main">5つの質問に答えるだけ</div>
+          <div class="t-sub">あなたの<b>旅タイプ</b>＆<b>おすすめ旅先BEST3</b>を<br>AIが診断します🤖</div>
+        </div>
+        <div class="perf"></div>
+        <div class="t-btm">
+          <div class="t-plus">— and more —</div>
+          <div class="t-plan">診断のあとは、AIが<b>「あなただけの旅行プラン」</b>を<br>その場でおつくりします✈️✨</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="start-foot">
+      <button class="btn" onclick="startQuiz()">診断をはじめる ✈️</button>
+      <div class="micro">無料・約30秒で完了します</div>
+    </div>
+  </section>
+
+  <!-- ②質問 -->
+  <section class="screen" id="s-quiz">
+    <div class="q-top">
+      <div class="brand-min">Lumia</div>
+      <div class="q-count" id="qCount">Q1 / 5</div>
+    </div>
+    <div class="q-track">
+      <div class="rail"></div>
+      <div class="fill" id="qFill"></div>
+      <div class="qplane" id="qPlane">✈️</div>
+    </div>
+    <div class="q-num" id="qNum">01</div>
+    <div class="q-text" id="qText"></div>
+    <div class="opts" id="qOpts"></div>
+  </section>
+
+  <!-- ③分析中 -->
+  <section class="screen" id="s-analyzing">
+    <div class="loading">
+      <div class="sky"><div class="arc"></div><div class="fly">✈️</div></div>
+      <h2>AIがあなたの回答を分析中…🤖✨</h2>
+      <div class="sub">旅のスタイルを読み取っています</div>
+      <div class="dots"><i></i><i></i><i></i></div>
+    </div>
+  </section>
+
+  <!-- ④診断結果 -->
+  <section class="screen" id="s-result">
+    <div class="r-head">
+      <div class="eyebrow">— YOUR TRAVEL TYPE —</div>
+      <div class="stamp"><span class="se" id="rEmoji"></span><span class="st">LUMIA TRAVEL</span></div>
+      <div class="r-you">あなたは…</div>
+      <div class="r-type" id="rType"></div>
+      <div class="r-rule"></div>
+    </div>
+    <div class="r-desc" id="rDesc"></div>
+    <div class="r-best">
+      <h3>おすすめ旅先 BEST3</h3>
+      <div class="best-list" id="rBest"></div>
+    </div>
+    <div class="r-cta">
+      <button class="btn" onclick="goForm()">✈️ この旅先で<br>“私だけの旅行プラン”をAIで作ってみる</button>
+      <button class="btn-sub" onclick="resetAll()">もう一度診断する</button>
+    </div>
+  </section>
+
+  <!-- ⑤プラン条件入力 -->
+  <section class="screen" id="s-form">
+    <div class="f-head">
+      <div class="brand-min">Lumia</div>
+      <div class="eyebrow" style="margin-top:8px;">— AI TRAVEL PLAN —</div>
+      <div class="f-title">あなただけの旅行プランを<br>AIがおつくりします</div>
+      <div class="f-note">タップで選ぶだけ。だいたいでOKです</div>
+    </div>
+
+    <div class="fset">
+      <label><span class="no">01</span>行き先</label>
+      <div class="chips" id="fDest"></div>
+      <input type="text" id="fDestFree" placeholder="その他の行き先があれば入力（例：ロンドン）">
+    </div>
+    <div class="fset">
+      <label><span class="no">02</span>旅行予定日<small>未定でもOK</small></label>
+      <div class="chips" data-group="when">
+        <button class="chip">3ヶ月以内</button><button class="chip">半年以内</button><button class="chip">1年以内</button><button class="chip on">まだ未定</button>
+      </div>
+    </div>
+    <div class="fset">
+      <label><span class="no">03</span>旅行日数</label>
+      <div class="chips" data-group="days">
+        <button class="chip">1泊2日</button><button class="chip on">2泊3日</button><button class="chip">3泊4日</button><button class="chip">4泊5日</button><button class="chip">1週間くらい</button>
+      </div>
+    </div>
+    <div class="fset">
+      <label><span class="no">04</span>誰と行く？</label>
+      <div class="chips" data-group="with">
+        <button class="chip">ひとり</button><button class="chip">夫婦・パートナー</button><button class="chip">友達</button><button class="chip">家族（子どもと）</button><button class="chip">家族（大人だけ）</button>
+      </div>
+    </div>
+    <div class="fset">
+      <label><span class="no">05</span>人数</label>
+      <div class="chips" data-group="people">
+        <button class="chip">1人</button><button class="chip on">2人</button><button class="chip">3人</button><button class="chip">4人</button><button class="chip">5人以上</button>
+      </div>
+    </div>
+    <div class="fset">
+      <label><span class="no">06</span>予算<small>おひとり分</small></label>
+      <div class="chips" data-group="budget">
+        <button class="chip">〜10万円</button><button class="chip on">10〜20万円</button><button class="chip">20〜30万円</button><button class="chip">30万円〜</button><button class="chip">こだわらない</button>
+      </div>
+    </div>
+    <div class="fset">
+      <label><span class="no">07</span>やりたいこと<small>いくつでも</small></label>
+      <div class="chips multi" data-group="wants">
+        <button class="chip">ビーチ・海</button><button class="chip">観光名所めぐり</button><button class="chip">絶景・自然</button><button class="chip">スパ・エステ</button><button class="chip">ショッピング</button><button class="chip">テーマパーク</button><button class="chip">アクティビティ</button><button class="chip">街歩き</button><button class="chip">写真映え</button><button class="chip">のんびり</button>
+      </div>
+      <input type="text" id="fWantFree" placeholder="他にあれば入力（例：ジンベエザメと泳ぐ）">
+    </div>
+    <div class="fset">
+      <label><span class="no">08</span>食べたいもの<small>いくつでも</small></label>
+      <div class="chips multi" data-group="foods">
+        <button class="chip">現地グルメ</button><button class="chip">カフェ・スイーツ</button><button class="chip">シーフード</button><button class="chip">屋台・ローカル</button><button class="chip">ホテルで優雅に</button><button class="chip">なんでもOK</button>
+      </div>
+    </div>
+    <div class="fset">
+      <label><span class="no">09</span>旅行で重視すること</label>
+      <div class="chips" data-group="focus">
+        <button class="chip">コスパ</button><button class="chip">ゆったり快適</button><button class="chip">移動がラク</button><button class="chip">贅沢感</button><button class="chip">安心・安全</button><button class="chip">子連れでも安心</button>
+      </div>
+    </div>
+
+    <div class="f-submit">
+      <button class="btn gold">AIに旅行プランをつくってもらう ✈️</button>
+    </div>
+  </section>
+
+  <!-- ⑥生成中 -->
+  <section class="screen" id="s-generating">
+    <div class="loading">
+      <div class="sky"><div class="arc"></div><div class="fly">✈️</div></div>
+      <h2>AIがあなた専用の旅行を<br>プランニング中…🤖</h2>
+      <div class="sub" id="genMsg">ご希望を読み込んでいます…</div>
+      <div class="dots"><i></i><i></i><i></i></div>
+    </div>
+  </section>
+
+  <!-- ⑦完成プラン -->
+  <section class="screen" id="s-plan">
+    <div class="p-head">
+      <div class="eyebrow">— YOUR AI TRAVEL PLAN —</div>
+      <h2 id="pTitle"></h2>
+      <div class="p-lead" id="pLead"></div>
+      <div class="p-tags" id="pTags"></div>
+    </div>
+    <div id="pDays"></div>
+    <div class="p-points" id="pPoints"></div>
+    <div class="p-save">この画面はスクリーンショットで保存できます📸</div>
+    <div class="p-lumia">
+      <i class="halo"></i>
+      <div class="pl-logo">Lumia AI SCHOOL<small>女性のためのAIスクール</small></div>
+      <p>この旅行プランは、AIがその場でおつくりしました。</p>
+      <div class="pl-fact">実は、<b>この診断サイトそのものも</b>、<br>AIに日本語で「作って」とお願いして<br>できあがったものです🤖</div>
+      <div class="pl-close">こういうものを、<br>自分でつくれるようになる。<br>それが、Lumia AI SCHOOLです。</div>
+      <p>旅行のほかにも、仕事・資料づくり・SNS・家事・子育て。<br>毎日に使えるAI活用術を、LINEでお届けしていきます🌹</p>
+    </div>
+    <button class="btn-sub" onclick="goForm()">条件を変えてもう一度つくる</button>
+    <div class="foot">© Metoriarch / Lumia AI SCHOOL</div>
+  </section>
+
+</div>
+
+<script>
+/* ================= 診断データ ================= */
+const QUESTIONS = [
+  { q:"今のあなたが旅に一番求めているものは？", opts:[
+    ["A","🌿","とにかく癒されたい"],
+    ["B","🍽️","美味しいものを楽しみたい"],
+    ["C","🌏","非日常・刺激がほしい"],
+    ["D","💄","美容・ショッピングを楽しみたい"],
+    ["E","👨‍👩‍👧","大切な人との思い出を作りたい"]]},
+  { q:"理想の過ごし方は？", opts:[
+    ["A","🏖","海・ホテル・スパでのんびり"],
+    ["B","☕","カフェ・レストランを巡る"],
+    ["C","🚀","観光もアクティビティも満喫"],
+    ["D","🛍","街歩き・買い物・美容"],
+    ["E","🎡","子どもや家族と一緒に楽しむ"]]},
+  { q:"旅先を選ぶなら？", opts:[
+    ["A","🌴","南国リゾート"],
+    ["B","🥢","グルメが充実した都市"],
+    ["C","🏔","大自然や初めての場所"],
+    ["D","✨","トレンド感のある都市"],
+    ["E","🧸","安心して家族で楽しめる場所"]]},
+  { q:"旅行でお金をかけたいのは？", opts:[
+    ["A","🏨","ホテル・スパ"],
+    ["B","🍷","食事"],
+    ["C","🪂","体験・アクティビティ"],
+    ["D","💅","美容・ショッピング"],
+    ["E","🎠","家族みんなが楽しめること"]]},
+  { q:"誰と行きたい？", opts:[
+    ["A","💑","ひとり・パートナー"],
+    ["B","👭","友達"],
+    ["C","🙌","仲間・パートナー"],
+    ["D","👩‍❤️‍👩","女友達"],
+    ["E","👨‍👩‍👧‍👦","家族・子ども"]]}
+];
+
+const TYPES = {
+  A:{ emoji:"🌴", name:"ご褒美リゾートタイプ",
+      desc:"日常から離れて、心と身体をゆるめる旅がぴったり。",
+      best:[["バリ島","神々の島でスパ＆ヴィラ滞在"],["ダナン","ビーチとホテルステイの穴場"],["ハワイ","王道の楽園でチャージ"]] },
+  B:{ emoji:"🍽️", name:"グルメ＆街歩きタイプ",
+      desc:"その土地ならではの食や街を楽しむ旅行がぴったり。",
+      best:[["ソウル","食もカフェも最先端"],["台北","小籠包と夜市の食い倒れ"],["バンコク","屋台から高級店まで"]] },
+  C:{ emoji:"🌏", name:"冒険・非日常タイプ",
+      desc:"絶景・大自然・アクティビティなど、普段できない体験を楽しむ旅行がぴったり。",
+      best:[["オーストラリア","世界遺産の海と大自然"],["ニュージーランド","星空と絶景の宝庫"],["セブ島","海遊びの聖地"]] },
+  D:{ emoji:"💄", name:"美容＆トレンドタイプ",
+      desc:"美容・ファッション・ショッピング・話題のスポットを楽しむ旅行がぴったり。",
+      best:[["ソウル","美容大国でキレイを磨く"],["パリ","本場のモードと美術館"],["上海","進化が止まらない摩天楼"]] },
+  E:{ emoji:"👨‍👩‍👧", name:"ファミリー思い出タイプ",
+      desc:"大人も子どもも楽しめて、家族みんなの思い出になる旅行がぴったり。",
+      best:[["シンガポール","清潔・安全・遊び場の宝庫"],["グアム","3時間半で着く常夏"],["沖縄","気軽に行ける家族の楽園"]] }
+};
+
+const FLAG = { "バリ島":"🇮🇩","ダナン":"🇻🇳","ハワイ":"🌺","ソウル":"🇰🇷","台北":"🇹🇼","バンコク":"🇹🇭",
+  "オーストラリア":"🇦🇺","ニュージーランド":"🇳🇿","セブ島":"🇵🇭","パリ":"🇫🇷","上海":"🇨🇳",
+  "シンガポール":"🇸🇬","グアム":"🌴","沖縄":"🌺" };
+
+/* ============ 退避用（通信が使えない時の見本データ） ============ */
+const DEST = {
+"バリ島":{fl:"直行便で約7時間",sp:["ウブドの棚田を望むテラスで朝ごはん","ティルタ・ウンプル寺院を見学","スミニャックのビーチクラブでのんびり","ジンバランのサンセットビーチ"],fd:["ナシゴレンなどインドネシア料理","ジンバランのシーフードBBQ","カフェでスムージーボウル"],tr:"バリニーズスパで2時間の全身トリートメント",tip:"雨季（11〜3月）はスコール対策に薄手の羽織りがあると安心です"},
+"ダナン":{fl:"直行便で約5時間半",sp:["ミーケビーチで朝さんぽ","バーナーヒルズの“神の手”ゴールデンブリッジ","世界遺産ホイアンのランタン夜景","大理石の山・五行山"],fd:["焼きたてバインミー","名物麺ミークアン","海沿いレストランのシーフード"],tr:"高級スパのトリートメント（日本の半額ほどの感覚）",tip:"通貨ドンは桁が大きいので、レート早見メモを1枚持つと安心です"},
+"ハワイ":{fl:"直行便で約7時間半",sp:["ワイキキビーチで朝さんぽ","ダイヤモンドヘッドで朝日ハイク","ラニカイ・カイルアの天国の海","アラモアナでショッピング"],fd:["ガーリックシュリンプ","ふわふわパンケーキの朝食","ポケボウル"],tr:"ハワイ伝統のロミロミマッサージ",tip:"時差ボケ対策に、初日は昼寝を短めにして早めに休むのがコツです"},
+"ソウル":{fl:"直行便で約2時間半",sp:["景福宮で韓服レンタル＆撮影","聖水洞（ソンスドン）のカフェ巡り","明洞・オリーブヤングでコスメ爆買い","漢南洞のセレクトショップ街"],fd:["サムギョプサル","韓国式ブランチカフェ","屋台のホットク"],tr:"韓方よもぎ蒸し＆あかすり体験",tip:"交通カードT-moneyを1枚つくると地下鉄・バス移動がぐっとラクです"},
+"台北":{fl:"直行便で約4時間",sp:["夕暮れの九份で提灯の街並み","迪化街でお茶とかわいい雑貨探し","中山エリアのカフェ通り","士林夜市で食べ歩き"],fd:["鼎泰豊などの小籠包","魯肉飯","豆花＆マンゴーかき氷"],tr:"台湾式足つぼマッサージで歩き疲れリセット",tip:"悠遊カード（EasyCard）があればMRT・バス・コンビニ全部これ1枚です"},
+"バンコク":{fl:"直行便で約7時間",sp:["ワット・アルンなど三大寺院めぐり","チャトチャック・ウィークエンドマーケット","川沿いの巨大モール アイコンサイアム","ルーフトップバーで夜景"],fd:["ガパオライス","トムヤムクン","マンゴースティッキーライス"],tr:"老舗スパでタイ古式マッサージ2時間",tip:"市内の移動は配車アプリGrabを使うと料金交渉いらずで安心です"},
+"オーストラリア":{fl:"ケアンズへ直行便で約7時間半",sp:["世界遺産グレートバリアリーフでシュノーケリング","キュランダ高原列車で熱帯雨林へ","世界最古の森デインツリー","コアラを抱っこできる動物園"],fd:["オージービーフのステーキ","シーフードプラッター","朝市のトロピカルフルーツ"],tr:"南半球の星空で南十字星さがし",tip:"日差しが強いので、日焼け止めは現地基準の強力なものが安心です"},
+"ニュージーランド":{fl:"直行便で約11時間",sp:["テカポ湖の星空保護区で天の川観賞","クイーンズタウンの絶景ゴンドラ","ミルフォード・サウンドの氷河クルーズ","羊牧場でファームステイ体験"],fd:["名物ラム料理","フィッシュ＆チップス","本場のフラットホワイト"],tr:"星空ツアーで一生ものの夜空を",tip:"朝晩の寒暖差が大きいので、重ね着できる服装が便利です"},
+"セブ島":{fl:"直行便で約5時間",sp:["アイランドホッピングで離島の海へ","ジンベエザメと一緒に泳ぐ体験","カオハガン島でのんびり","サンセットクルーズ"],fd:["レチョン（豚の丸焼き）","とろける完熟マンゴー","市場の新鮮シーフード"],tr:"海辺のヴィラでアロマスパ",tip:"離島ツアーは朝が早いので、前日は早めに休むのがおすすめです"},
+"パリ":{fl:"直行便で約14時間",sp:["ルーブル＆オルセー美術館","マレ地区の路地さんぽ","サントノーレ通りでショッピング","セーヌ川ディナークルーズ"],fd:["老舗カフェのクロワッサン朝食","気取らないビストロのランチ","憧れパティスリーのケーキ"],tr:"パッサージュで自分だけの香水選び",tip:"美術館はネットで日時予約しておくと行列を横目に入場できます"},
+"上海":{fl:"直行便で約3時間",sp:["外灘（バンド）の摩天楼夜景","田子坊の路地でかわいい雑貨探し","新天地のおしゃれカフェ","明代の庭園・豫園"],fd:["小籠包の名店食べくらべ","火鍋","生煎（焼き小籠包）"],tr:"変身写真館でチャイナドレス撮影",tip:"支払いはAlipay（海外旅行者版）を入れておくとスムーズです"},
+"シンガポール":{fl:"直行便で約7時間",sp:["マリーナベイ・サンズの展望デッキ","ガーデンズ・バイ・ザ・ベイの夜のライトショー","セントーサ島のユニバーサル・スタジオ","世界初のナイトサファリ"],fd:["チキンライス","チリクラブ","ホーカーズ（屋台街）食べ歩き"],tr:"家族みんなで屋上インフィニティプール",tip:"屋内は冷房が強めなので、羽織りものが1枚あると安心です"},
+"グアム":{fl:"直行便で約3時間半",sp:["タモンビーチで海遊び","イルカウォッチングクルーズ","絶景の恋人岬","ウォーターパークで1日遊ぶ"],fd:["チャモロ料理のBBQ","本場のボリュームバーガー","ホテルの朝食パンケーキ"],tr:"キッズプログラム付きホテルで大人もひと休み",tip:"街はラフな服装でOK。ビーチサンダルで過ごせる気軽さが魅力です"},
+"沖縄":{fl:"直行便で約2時間半",sp:["美ら海水族館でジンベエザメ","古宇利大橋の絶景ドライブ","国際通りで食べ歩き","ビーチでシュノーケリング体験"],fd:["沖縄そば","タコライス","ブルーシールアイス"],tr:"家族で琉球ガラス作り体験",tip:"レンタカーは早めの予約が安心です。台風シーズンは予備日があると◎"}
+};
+
+/* ================= 状態 ================= */
+let answers = [];      // ["A","C",...]
+let qIndex = 0;
+let resultType = null; // "A"〜"E"
+
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  window.scrollTo(0,0);
+}
+
+/* ================= 診断フロー ================= */
+function startQuiz(){ answers=[]; qIndex=0; renderQ(); show("s-quiz"); }
+
+function renderQ(){
+  const Q = QUESTIONS[qIndex];
+  const pct = qIndex/5*100;
+  document.getElementById("qCount").textContent = `Q${qIndex+1} / 5`;
+  document.getElementById("qFill").style.width = `${pct}%`;
+  document.getElementById("qPlane").style.left = `${pct}%`;
+  document.getElementById("qNum").textContent = `0${qIndex+1}`;
+  document.getElementById("qText").textContent = Q.q;
+  const box = document.getElementById("qOpts");
+  box.innerHTML = "";
+  Q.opts.forEach(([letter, icon, text])=>{
+    const b = document.createElement("button");
+    b.className = "opt";
+    b.innerHTML = `<span class="oi">${icon}</span><span>${text}</span>`;
+    b.onclick = ()=>{
+      if(box.dataset.lock) return;
+      box.dataset.lock = "1";
+      b.classList.add("picked");
+      answers.push(letter);
+      setTimeout(()=>{
+        delete box.dataset.lock;
+        qIndex++;
+        if(qIndex < 5){ renderQ(); }
+        else{
+          document.getElementById("qFill").style.width = "100%";
+          document.getElementById("qPlane").style.left = "100%";
+          show("s-analyzing");
+          setTimeout(showResult, 2200);
+        }
+      }, 300);
+    };
+    box.appendChild(b);
+  });
+}
+
+function judge(){
+  const count = {A:0,B:0,C:0,D:0,E:0};
+  answers.forEach(l=>count[l]++);
+  const max = Math.max(...Object.values(count));
+  const tied = Object.keys(count).filter(k=>count[k]===max);
+  if(tied.length === 1) return tied[0];
+  for(const l of answers){ if(tied.includes(l)) return l; } // Q1→Q2→Q3の順で優先
+  return tied[0];
+}
+
+function showResult(){
+  resultType = judge();
+  const T = TYPES[resultType];
+  document.getElementById("rEmoji").textContent = T.emoji;
+  document.getElementById("rType").textContent = T.name + "！";
+  document.getElementById("rDesc").textContent = T.desc;
+  const ranks = [["1st","GOLD"],["2nd","SILVER"],["3rd","BRONZE"]];
+  document.getElementById("rBest").innerHTML = T.best.map(([name,cap],i)=>
+    `<div class="best"><span class="medal"><b>${ranks[i][0]}</b><small>PLACE</small></span>
+      <div><div class="name">${name}<span class="flag">${FLAG[name]||""}</span></div><div class="cap">${cap}</div></div></div>`
+  ).join("");
+  show("s-result");
+}
+
+function resetAll(){ answers=[]; qIndex=0; show("s-start"); }
+
+/* ================= プラン条件フォーム ================= */
+function goForm(){
+  const T = TYPES[resultType || "A"];
+  const dest = document.getElementById("fDest");
+  dest.innerHTML = "";
+  T.best.forEach(([name],i)=>{
+    const b = document.createElement("button");
+    b.className = "chip" + (i===0 ? " on" : "");
+    b.textContent = `${FLAG[name]||""} ${name}`;
+    b.dataset.name = name;
+    b.onclick = ()=>{ dest.querySelectorAll(".chip").forEach(c=>c.classList.remove("on")); b.classList.add("on"); };
+    dest.appendChild(b);
+  });
+  show("s-form");
+}
+
+document.querySelectorAll(".chips[data-group]").forEach(group=>{
+  const multi = group.classList.contains("multi");
+  group.querySelectorAll(".chip").forEach(chip=>{
+    chip.onclick = ()=>{
+      if(multi){ chip.classList.toggle("on"); }
+      else{ group.querySelectorAll(".chip").forEach(c=>c.classList.remove("on")); chip.classList.add("on"); }
+    };
+  });
+});
+document.querySelector(".f-submit .btn").onclick = ()=>generatePlan();
+
+function pick(name){
+  const g = document.querySelector(`.chips[data-group="${name}"]`);
+  const on = [...g.querySelectorAll(".chip.on")].map(c=>c.textContent);
+  return g.classList.contains("multi") ? on : (on[0] || "おまかせ");
+}
+
+function collectForm(){
+  const destChip = document.querySelector("#fDest .chip.on");
+  const destFree = document.getElementById("fDestFree").value.trim();
+  return {
+    type: TYPES[resultType || "A"].name,
+    destination: destFree || (destChip ? destChip.dataset.name : "おまかせ"),
+    when: pick("when"), days: pick("days"), companions: pick("with"),
+    people: pick("people"), budget: pick("budget"),
+    wants: [...pick("wants"), document.getElementById("fWantFree").value.trim()].filter(Boolean),
+    foods: pick("foods"), focus: pick("focus")
+  };
+}
+
+/* ================= AIプラン生成 ================= */
+const GEN_MSGS = [
+  "現地の観光スポットを調べています…🗺",
+  "お食事プランを考えています…🍽",
+  "移動と過ごし方を整えています…🚕",
+  "あなた好みに仕上げています…✨"
+];
+let genTimer = null;
+
+async function generatePlan(){
+  const form = collectForm();
+  show("s-generating");
+  let mi = 0;
+  const msgEl = document.getElementById("genMsg");
+  msgEl.textContent = GEN_MSGS[0];
+  genTimer = setInterval(()=>{ mi=(mi+1)%GEN_MSGS.length; msgEl.textContent = GEN_MSGS[mi]; }, 3200);
+
+  const t0 = Date.now();
+  const minWait = ms => new Promise(r=>setTimeout(r, Math.max(0, 2600-(Date.now()-t0)))); // 演出が一瞬で消えないための最短表示
+
+  const ctrl = new AbortController();
+  const timeout = setTimeout(()=>ctrl.abort(), 45000);
+  try{
+    const res = await fetch("/api/plan", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(form),
+      signal: ctrl.signal
+    });
+    clearTimeout(timeout);
+    if(!res.ok) throw new Error("api " + res.status);
+    const data = await res.json();
+    const plan = normalizePlan(data);
+    if(!plan) throw new Error("parse");
+    await minWait();
+    renderPlan(plan, form);
+  }catch(e){
+    await minWait();
+    renderPlan(fallbackPlan(form), form); // 通信・混雑時は見本プランに即切り替え
+  }finally{
+    clearTimeout(timeout);
+    clearInterval(genTimer);
+  }
+}
+
+function normalizePlan(data){
+  let p = data.plan || data;
+  if(typeof p === "string"){
+    try{ p = JSON.parse(p.replace(/^```(json)?/m,"").replace(/```\s*$/m,"").trim()); }catch(e){ return null; }
+  }
+  if(!p || !Array.isArray(p.days) || !p.days.length) return null;
+  return p;
+}
+
+/* ---- 退避モード：見本プランを組み立てる ---- */
+function daysCount(label){
+  return ({"1泊2日":2,"2泊3日":3,"3泊4日":4,"4泊5日":5,"1週間くらい":5})[label] || 3;
+}
+function fallbackPlan(form){
+  const d = DEST[form.destination] || DEST["ハワイ"];
+  const n = daysCount(form.days);
+  const days = [];
+  days.push({ label:"1日目", theme:"出発・とうちゃく", items:[
+    {time:"午前", text:`日本を出発（${d.fl}）`},
+    {time:"午後", text:"ホテルにチェックインして、周辺をゆっくりおさんぽ"},
+    {time:"夜",   text:`さっそく${d.fd[0]}で現地初ごはん`} ]});
+  for(let i=1; i<n-1; i++){
+    const sp1 = d.sp[(i*2-2) % d.sp.length];
+    const sp2 = d.sp[(i*2-1) % d.sp.length];
+    const fd  = d.fd[i % d.fd.length];
+    const items = [
+      {time:"午前", text: sp1},
+      {time:"ランチ", text: fd},
+      {time:"午後", text: sp2} ];
+    items.push(i===1 ? {time:"夜", text: d.tr} : {time:"夜", text:"気になったお店でディナー＆ホテルでゆっくり"});
+    days.push({ label:`${i+1}日目`, theme:"たっぷり満喫", items });
+  }
+  days.push({ label:`${n}日目`, theme:"おみやげ・帰国", items:[
+    {time:"午前", text:"おみやげ探し＆最後のおさんぽ"},
+    {time:"午後", text:"空港へ。おつかれさまでした✈️"} ]});
+  return {
+    title: `${form.destination} ${form.days}の旅`,
+    lead: `${form.companions}での${form.destination}旅行プランです。`,
+    days,
+    points: [ d.tip,
+      "現地の移動は、ホテル発着ツアーや配車アプリを使うとラクです",
+      "パスポートの残存期間は出発前に確認しておくと安心です" ]
+  };
+}
+
+/* ---- プラン表示 ---- */
+function renderPlan(plan, form){
+  document.getElementById("pTitle").textContent = plan.title || `${form.destination}の旅`;
+  document.getElementById("pLead").textContent = plan.lead || "";
+  document.getElementById("pTags").innerHTML =
+    [`${FLAG[form.destination]||"✈️"} ${form.destination}`, form.days, `${form.people}`, form.companions, `予算 ${form.budget}`]
+    .map(t=>`<span>${t}</span>`).join("");
+  document.getElementById("pDays").innerHTML = (plan.days||[]).map((day,i)=>`
+    <div class="day">
+      <div class="d-head">
+        <div class="d-no"><b>${i+1}</b><small>DAY</small></div>
+        <div class="d-t"><b>${day.label||`${i+1}日目`}</b><span>${day.theme||""}</span></div>
+      </div>
+      <div class="d-body">${(day.items||[]).map(it=>`
+        <div class="slot"><div class="t"><i>${it.time||""}</i></div><div class="x">${it.text||""}</div></div>`).join("")}
+      </div>
+    </div>`).join("");
+  const pts = plan.points || [];
+  document.getElementById("pPoints").innerHTML = pts.length
+    ? `<h4>TRAVEL MEMO</h4><ul>${pts.map(p=>`<li>${p}</li>`).join("")}</ul>` : "";
+  show("s-plan");
+}
+</script>
+</body>
+</html>
