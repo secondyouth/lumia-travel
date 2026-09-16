@@ -22,6 +22,31 @@ const SYSTEM_PROMPT = `あなたは「Lumia AI SCHOOL（女性のためのAIス�
 - 文体は明るく上品に。絵文字は各textに多くて1個まで。誇張や「!!」の連発はしない。
 - 各itemのtextは50字以内。読みやすく短く。`;
 
+/* モデルの返答からJSONを取り出す。
+   「はい、承知しました」のような前置きやコードブロック記号が付いてくることがあるので、
+   そのまま JSON.parse せず、いくつかの候補を順に試す。 */
+function extractPlan(data) {
+  const raw = (data.content || [])
+    .filter(b => b.type === "text")
+    .map(b => b.text)
+    .join("");
+
+  const candidates = [];
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) candidates.push(fenced[1]);
+  const i = raw.indexOf("{"), j = raw.lastIndexOf("}");
+  if (i >= 0 && j > i) candidates.push(raw.slice(i, j + 1));
+  candidates.push(raw.trim());
+
+  for (const c of candidates) {
+    try {
+      const o = JSON.parse(c);
+      if (o && Array.isArray(o.days) && o.days.length) return o;
+    } catch { /* 次の候補を試す */ }
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -48,44 +73,42 @@ export default async function handler(req, res) {
 - 食べたいもの: ${list(f.foods, 4) || "おまかせ"}
 - 重視すること: ${clip(f.focus, 15) || "おまかせ"}`;
 
+  const callModel = () => fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      /* 1800だと4〜5日のプランで書き切れずに途中で切れることがあった。
+         上限を上げても、実際に使った分しか課金されない */
+      max_tokens: 4000,
+      system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+  });
+
   try {
-    const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1800,
-        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
-
-    if (!apiResponse.ok) {
-      const t = await apiResponse.text();
-      console.error("Anthropic API error:", apiResponse.status, t.slice(0, 300));
-      return res.status(502).json({ error: `API ${apiResponse.status}` });
+    /* たまたま1回失敗しただけで見本プランに落とさないよう、2回まで試す */
+    let plan = null, lastData = null;
+    for (let attempt = 1; attempt <= 2 && !plan; attempt++) {
+      const apiResponse = await callModel();
+      if (!apiResponse.ok) {
+        const t = await apiResponse.text();
+        console.error("Anthropic API error:", apiResponse.status, t.slice(0, 300));
+        return res.status(502).json({ error: `API ${apiResponse.status}` });
+      }
+      lastData = await apiResponse.json();
+      plan = extractPlan(lastData);
+      if (!plan) {
+        console.error("parse failed (attempt " + attempt + ") stop_reason:",
+                      lastData.stop_reason, "usage:", JSON.stringify(lastData.usage));
+      }
     }
-
-    const data = await apiResponse.json();
-    const text = (data.content || [])
-      .filter(b => b.type === "text")
-      .map(b => b.text)
-      .join("")
-      .replace(/^```(json)?/m, "")
-      .replace(/```\s*$/m, "")
-      .trim();
-
-    let plan;
-    try {
-      plan = JSON.parse(text);
-    } catch {
-      return res.status(502).json({ error: "parse" });
-    }
-    return res.status(200).json({ plan, usage: data.usage });
+    if (!plan) return res.status(502).json({ error: "parse" });
+    return res.status(200).json({ plan, usage: lastData.usage });
   } catch (err) {
     console.error("Function error:", err);
     return res.status(500).json({ error: err.message || "生成に失敗しました" });
