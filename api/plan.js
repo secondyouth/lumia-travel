@@ -107,7 +107,22 @@ export default async function handler(req, res) {
                       lastData.stop_reason, "usage:", JSON.stringify(lastData.usage));
       }
     }
-    if (!plan) return res.status(502).json({ error: "parse" });
+    if (!plan) {
+      /* 原因調査用。body に __debug:"lumia" を入れたときだけ、モデルの返答をそのまま返す。
+         調べ終わったらこのブロックは消してよい */
+      if ((req.body || {}).__debug === "lumia") {
+        const raw = (lastData.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+        return res.status(502).json({
+          error: "parse",
+          stop_reason: lastData.stop_reason,
+          usage: lastData.usage,
+          content_types: (lastData.content || []).map(b => b.type),
+          raw_head: raw.slice(0, 600),
+          raw_len: raw.length
+        });
+      }
+      return res.status(502).json({ error: "parse" });
+    }
     return res.status(200).json({ plan, usage: lastData.usage });
   } catch (err) {
     console.error("Function error:", err);
