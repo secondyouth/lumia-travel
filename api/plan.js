@@ -14,6 +14,7 @@ const SYSTEM_PROMPT = `あなたは「Lumia AI SCHOOL（女性のためのAIス�
 {"title":"プランのタイトル（行き先と日数を含む・25字以内）","lead":"プランの紹介文1〜2文（60字以内）","days":[{"label":"1日目","theme":"その日のテーマ（10字以内）","items":[{"time":"午前","text":"..."},{"time":"ランチ","text":"..."},{"time":"午後","text":"..."},{"time":"夜","text":"..."}]}],"points":["旅のポイント3つ（持ち物・移動・予約のコツなど各40字以内）"]}
 
 # 中身のルール
+- daysは必ず「1日目」から順に、抜けなく全日分を出す。最終日だけ返すのは誤り。
 - daysの数は旅行日数に合わせる（1泊2日=2、2泊3日=3、3泊4日=4、4泊5日=5、1週間くらい=5日分+最終日のitemsに「残りの日はお気に入りの場所を再訪してゆったり」を含める）。
 - 1日目は出発・到着・チェックインから。最終日はおみやげと帰国で締める。
 - 実在する観光スポット名・料理名・エリア名を具体的に入れる（例:「観光」でなく「九份で提灯の街並みさんぽ」）。
@@ -25,6 +26,9 @@ const SYSTEM_PROMPT = `あなたは「Lumia AI SCHOOL（女性のためのAIス�
 /* モデルの返答からJSONを取り出す。
    「はい、承知しました」のような前置きやコードブロック記号が付いてくることがあるので、
    そのまま JSON.parse せず、いくつかの候補を順に試す。 */
+/* 選ばれた日数から、必要な日数を出す */
+const DAY_COUNT = { "1泊2日": 2, "2泊3日": 3, "3泊4日": 4, "4泊5日": 5, "1週間くらい": 5 };
+
 function extractPlan(data) {
   const raw = (data.content || [])
     .filter(b => b.type === "text")
@@ -45,6 +49,14 @@ function extractPlan(data) {
     } catch { /* 次の候補を試す */ }
   }
   return null;
+}
+
+/* 日数が合っているか。2泊3日なのに「3日目」だけ返ってくることが実際にあったため、
+   ここで弾いて引き直す */
+function dayCountOK(plan, daysLabel) {
+  const need = DAY_COUNT[daysLabel];
+  if (!need) return true;                 // 見たことのない値なら通す
+  return Array.isArray(plan.days) && plan.days.length === need;
 }
 
 export default async function handler(req, res) {
@@ -91,9 +103,10 @@ export default async function handler(req, res) {
   });
 
   try {
-    /* たまたま1回失敗しただけで見本プランに落とさないよう、2回まで試す */
+    /* 1回の失敗で見本プランに落とさないよう、3回まで試す。
+       読めない場合だけでなく、日数が合っていない場合も引き直す */
     let plan = null, lastData = null;
-    for (let attempt = 1; attempt <= 2 && !plan; attempt++) {
+    for (let attempt = 1; attempt <= 3 && !plan; attempt++) {
       const apiResponse = await callModel();
       if (!apiResponse.ok) {
         const t = await apiResponse.text();
@@ -101,28 +114,17 @@ export default async function handler(req, res) {
         return res.status(502).json({ error: `API ${apiResponse.status}` });
       }
       lastData = await apiResponse.json();
-      plan = extractPlan(lastData);
-      if (!plan) {
-        console.error("parse failed (attempt " + attempt + ") stop_reason:",
-                      lastData.stop_reason, "usage:", JSON.stringify(lastData.usage));
+      const got = extractPlan(lastData);
+      if (!got) {
+        console.error("parse failed (attempt " + attempt + ") stop_reason:", lastData.stop_reason);
+      } else if (!dayCountOK(got, f.days)) {
+        console.error("day count mismatch (attempt " + attempt + "):", got.days.length, "for", f.days);
+      } else {
+        plan = got;
       }
     }
-    if (!plan) {
-      /* 原因調査用。body に __debug:"lumia" を入れたときだけ、モデルの返答をそのまま返す。
-         調べ終わったらこのブロックは消してよい */
-      if ((req.body || {}).__debug === "lumia") {
-        const raw = (lastData.content || []).filter(b => b.type === "text").map(b => b.text).join("");
-        return res.status(502).json({
-          error: "parse",
-          stop_reason: lastData.stop_reason,
-          usage: lastData.usage,
-          content_types: (lastData.content || []).map(b => b.type),
-          raw_head: raw.slice(0, 600),
-          raw_len: raw.length
-        });
-      }
-      return res.status(502).json({ error: "parse" });
-    }
+    /* 3回とも駄目なら見本プランに任せる。日数の合わないプランを見せるより良い */
+    if (!plan) return res.status(502).json({ error: "parse" });
     return res.status(200).json({ plan, usage: lastData.usage });
   } catch (err) {
     console.error("Function error:", err);
