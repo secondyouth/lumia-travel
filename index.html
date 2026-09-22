@@ -120,6 +120,16 @@ img{ max-width:100%; height:auto; display:block; }
   box-shadow:0 14px 30px -8px rgba(194,167,106,.5), inset 0 1px 0 rgba(255,255,255,.4); }
 .btn-sub{ display:block; margin:20px auto 0; background:none; border:none; cursor:pointer;
   color:var(--note); font-size:13px; text-decoration:underline; text-underline-offset:3px; font-family:var(--gothic); }
+/* 次の来場者に端末を渡すときのボタン。
+   「条件を変えてもう一度つくる」（同じ人が別の行き先を見る）と役割が違うので、
+   枠をつけて区別できるようにしている */
+.btn-restart{ display:block; margin:16px auto 0; padding:11px 22px; cursor:pointer;
+  background:#fff; border:1.5px solid rgba(11,123,120,.35); border-radius:999px;
+  color:var(--teal-deep); font-size:14px; font-weight:700; font-family:var(--gothic);
+  letter-spacing:.04em; line-height:1.35; }
+.btn-restart small{ display:block; font-weight:400; font-size:11px; color:var(--note);
+  letter-spacing:.06em; margin-top:3px; }
+.btn-restart:active{ transform:scale(.98); }
 
 /* ===== スタート画面 ===== */
 #s-start{ padding:0 0 34px; }
@@ -699,12 +709,12 @@ img{ max-width:100%; height:auto; display:block; }
 
       <div class="sv-q">
         <label for="svName"><span class="n">Q1</span>お名前</label>
-        <input type="text" id="svName" maxlength="30" placeholder="例：佐藤 花子" autocomplete="name">
+        <input type="text" id="svName" maxlength="30" placeholder="例：佐藤 花子" autocomplete="off">
       </div>
 
       <div class="sv-q">
         <label for="svMail"><span class="n">Q2</span>メールアドレス</label>
-        <input type="email" id="svMail" maxlength="80" placeholder="例：hanako@example.com" autocomplete="email" inputmode="email">
+        <input type="email" id="svMail" maxlength="80" placeholder="例：hanako@example.com" autocomplete="off" inputmode="email">
       </div>
 
       <div class="sv-q">
@@ -766,6 +776,7 @@ img{ max-width:100%; height:auto; display:block; }
     </div>
 
     <button class="btn-sub" onclick="goForm()">条件を変えてもう一度つくる</button>
+    <button class="btn-restart" onclick="resetAll()">最初からやり直す<small>次の方にお渡しするとき</small></button>
     <div class="foot">© Lumia AI SCHOOL</div>
   </section>
 

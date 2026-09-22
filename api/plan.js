@@ -133,9 +133,10 @@ export default async function handler(req, res) {
        読めない場合だけでなく、日数が合っていない場合も引き直す */
     let plan = null, lastData = null;
     const started = Date.now();
-    /* 3回目に入っても画面側の45秒を超えないよう、経過26秒で打ち切る
-       （26秒 + 1回ぶん18秒 = 44秒） */
-    for (let attempt = 1; attempt <= 3 && !plan && Date.now() - started < 26000; attempt++) {
+    /* 3回目に入っても画面側の45秒を超えないよう、経過20秒で打ち切る。
+       20秒 + 1回ぶん18秒 = 38秒。Vercelの起動に数秒かかっても
+       画面側が先にあきらめてしまわないよう、7秒ほど余裕をみている */
+    for (let attempt = 1; attempt <= 3 && !plan && Date.now() - started < 20000; attempt++) {
       const apiResponse = await callModel();
       if (!apiResponse.ok) {
         const t = await apiResponse.text();
