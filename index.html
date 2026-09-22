@@ -383,7 +383,8 @@ img{ max-width:100%; height:auto; display:block; }
 #s-plan.failed .p-lumia,
 #s-plan.failed .p-save,
 #s-plan.failed .survey,
-#s-plan.failed #surveyCta{ display:none !important; }
+#s-plan.failed #surveyCta,
+#s-plan.failed .sv-done{ display:none !important; }
 .pl-ask{ margin-top:18px; }
 /* ===== 表示名の入力（スタート画面） ===== */
 .namebox{ background:#fff; border:1px solid rgba(194,167,106,.55); border-radius:16px;
@@ -792,8 +793,11 @@ const TOUR_LABEL = {
 let displayName = "";          // 冒頭で入力された表示名（未入力なら空）
 function tourName(){
   if(!displayName) return "";
-  return (TOUR_LABEL[resultType] || TOUR_LABEL.A)(displayName);
+  /* 「さとうさん」と入れた人が「さとうさんさんの」にならないように */
+  const n = displayName.replace(/(さん|サン|ちゃん)$/, "") || displayName;
+  return (TOUR_LABEL[resultType] || TOUR_LABEL.A)(n);
 }
+
 
 /* ================= 診断データ ================= */
 const QUESTIONS = [
@@ -936,8 +940,17 @@ const USING = ["毎日","週に数回","時々"];
 function updateSurveyBranch(){
   const g = document.querySelector('.chips[data-group="freq"] .chip.on');
   const v = g ? g.textContent : "";
-  document.getElementById("svToolsBox").hidden  = !(v && USING.includes(v));
-  document.getElementById("svFutureBox").hidden = !(v && !USING.includes(v));
+  const tools = document.getElementById("svToolsBox");
+  const future = document.getElementById("svFutureBox");
+  tools.hidden  = !(v && USING.includes(v));
+  future.hidden = !(v && !USING.includes(v));
+  /* 隠した側の選択は消す。Q4を選び直したときに、
+     画面に出ていない設問の答えが送信されてしまうため */
+  [tools, future].forEach(box=>{
+    if(box.hidden) box.querySelectorAll(".chip.on").forEach(c=>{
+      c.classList.remove("on"); c.setAttribute("aria-pressed","false");
+    });
+  });
 }
 
 /* アンケート内の選択チップ（本編のチップとは別に配線する） */
@@ -1014,11 +1027,14 @@ document.getElementById("svSend").onclick = async ()=>{
   try{
     /* Content-Type を text/plain にすると事前確認(preflight)が飛ばず、
        Apps Script のウェブアプリにそのまま届く */
-    await fetch(SURVEY_URL, {
+    const res = await fetch(SURVEY_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
     });
+    /* 送れたつもりで保存されていない、を防ぐ。
+       ここで弾かれた場合も端末側の控え（上のlocalStorage）は残っている */
+    if(!res.ok) throw new Error("survey " + res.status);
     surveyEl.hidden = true;
     document.getElementById("svDone").hidden = false;
     document.getElementById("svDone").scrollIntoView({ behavior:"smooth", block:"center" });
@@ -1032,8 +1048,9 @@ document.getElementById("svSend").onclick = async ()=>{
 
 /* 見本データの無い行き先で、AIにもつながらなかったときの画面 */
 function planError(dest){
-  document.getElementById("pOwner") && null;
-  const head = document.querySelector("#s-plan .p-head");
+  const pTour = document.getElementById("pTour");
+  pTour.textContent = ""; pTour.hidden = true;   // 前回のツアー名を残さない
+  document.getElementById("fDestFree").value = "";  // 作れなかった行き先は消す
   document.getElementById("pTitle").textContent = `${dest}のプランを作れませんでした`;
   document.getElementById("pLead").textContent =
     "通信が混み合っているようです。少し時間をおいてもう一度お試しいただくか、おすすめの行き先から選んでいただけると、すぐにおつくりできます。";
@@ -1138,7 +1155,51 @@ function showResult(){
   show("s-result");
 }
 
-function resetAll(){ answers=[]; qIndex=0; show("s-start"); }
+/* ページを読み込んだ時点で「最初から選ばれていたチップ」を控えておく。
+   もう一度診断するときに、ここへ戻す */
+const FORM_DEFAULTS = {};
+document.querySelectorAll("#s-form .chips[data-group]").forEach(g=>{
+  const chips = [...g.querySelectorAll(".chip")];
+  FORM_DEFAULTS[g.dataset.group] = chips
+    .map((c,i)=>c.classList.contains("on") ? i : -1).filter(i=>i>=0);
+});
+
+/* 端末を使いまわすので、次の人のために入力と表示を全部戻す。
+   ここを怠ると、1人目がアンケートを送ったあと2人目にボタンが出ない */
+function resetForNextPerson(){
+  answers = []; qIndex = 0; resultType = null; displayName = ""; lastForm = null;
+
+  // 入力欄
+  ["fName","fDestFree","fWantFree","svName","svMail"].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.value = "";
+  });
+  nameHint.textContent = "あなた専用のツアー名でおつくりします";
+  nameHint.classList.remove("filled");
+
+  // 条件フォームのチップを最初の状態に戻す
+  document.querySelectorAll("#s-form .chips[data-group]").forEach(g=>{
+    const chips = [...g.querySelectorAll(".chip")];
+    chips.forEach(c=>c.classList.remove("on"));
+    (FORM_DEFAULTS[g.dataset.group] || []).forEach(i=>chips[i] && chips[i].classList.add("on"));
+    syncPressed(g);
+  });
+
+  // アンケート
+  svRating = ""; svSending = false;
+  document.querySelectorAll(".rate, .sv-chips .chip").forEach(c=>c.classList.remove("on"));
+  document.querySelectorAll(".rate, .sv-chips .chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+  document.getElementById("svToolsBox").hidden = true;
+  document.getElementById("svFutureBox").hidden = true;
+  const msg = document.getElementById("svMsg");
+  msg.textContent = ""; msg.className = "sv-msg";
+  const btn = document.getElementById("svSend"); if(btn) btn.disabled = false;
+  document.getElementById("svDone").hidden = true;
+  surveyEl.hidden = true;
+  surveyCta.hidden = !SURVEY_URL;
+  document.getElementById("s-plan").classList.remove("failed");
+}
+
+function resetAll(){ resetForNextPerson(); show("s-start"); }
 
 /* ================= プラン条件フォーム ================= */
 function goForm(){
@@ -1150,12 +1211,31 @@ function goForm(){
     b.className = "chip" + (i===0 ? " on" : "");
     b.textContent = `${FLAG[name]||""} ${name}`;
     b.dataset.name = name;
-    b.onclick = ()=>{ dest.querySelectorAll(".chip").forEach(c=>c.classList.remove("on")); b.classList.add("on"); syncPressed(dest); };
+    b.onclick = ()=>{
+      dest.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));
+      b.classList.add("on"); syncPressed(dest);
+      destFreeEl.value = "";        // チップを選んだら自由入力は取り消す
+    };
     dest.appendChild(b);
   });
   syncPressed(dest);
   show("s-form");
 }
+
+/* 行き先は「チップ」か「自由入力」のどちらか一方だけが有効。
+   両方に値が残っていると、チップを押し直しても自由入力が優先されて
+   同じ行き先から抜け出せなくなるため、入力した側に寄せて相手を消す */
+const destFreeEl = document.getElementById("fDestFree");
+destFreeEl.addEventListener("input", ()=>{
+  const dest = document.getElementById("fDest");
+  if(destFreeEl.value.trim()){
+    dest.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));
+  }else{
+    const first = dest.querySelector(".chip");   // 空に戻したら1位に戻す
+    if(first) first.classList.add("on");
+  }
+  syncPressed(dest);
+});
 
 /* 選択中かどうかを aria-pressed でも伝える（色だけに頼らない） */
 function syncPressed(scope){
@@ -1302,7 +1382,10 @@ function fallbackPlan(form){
        ランチも街歩きも出てこなくなるため */
     const full = (i % 2 === 1) ? fullDay.shift() : null;
     // 夜は「夜のスポット → 体験（スパ等） → 汎用」の順に埋める
-    const yoru = night.shift() || (i === 1 ? d.tr : null) || FILL_NI[fn++ % FILL_NI.length];
+    /* 到着の翌日の夜は体験（スパ・マッサージ等）を優先する。
+       夜スポットを3件に増やしたとき、night が尽きなくなって
+       d.tr が一度も表示されなくなっていた */
+    const yoru = (i === 1 ? d.tr : null) || night.shift() || FILL_NI[fn++ % FILL_NI.length];
 
     if(full){
       days.push({ label:`${i+1}日目`, theme:"まる一日かけて", items:[
@@ -1320,17 +1403,33 @@ function fallbackPlan(form){
       {time:"午後", text: pm},
       {time:"夜", text: yoru} ]});
   }
-  /* 「1週間くらい」は5日分しか組まないので、余る日の過ごし方を一言そえる */
   const lastItems = [];
+  /* 1泊2日は中日のループが一度も回らず、出発とおみやげだけになってしまう。
+     到着日の午後と最終日の午前に、観光を1つずつ入れておく */
+  let short2 = false;
+  if(n === 2){
+    short2 = true;
+    const spot1 = daytime.shift() || morning.shift();
+    const spot2 = daytime.shift() || morning.shift();
+    if(spot1) days[0].items[1] = {time:"午後", text:`ホテルにチェックインして、${spot1}`};
+    if(night.length) days[0].items[2] = {time:"夜", text: night.shift()};
+    if(spot2) lastItems.push({time:"午前", text: spot2});
+  }
+  /* 「1週間くらい」は5日分しか組まないので、余る日の過ごし方を一言そえる */
   if(form.days === "1週間くらい"){
     lastItems.push({time:"予備日", text:"残りの日は、気に入った場所を再訪したり、ホテルでのんびり。予定を入れすぎない日があると旅は締まります"});
   }
-  lastItems.push({time:"午前", text:"おみやげ探し＆最後のおさんぽ"});
-  lastItems.push({time:"午後", text:"空港へ。おつかれさまでした✈️"});
+  /* 1泊2日は最終日の午前に観光を入れたので、おみやげは午後にまとめる */
+  if(short2){
+    lastItems.push({time:"午後", text:"おみやげを買って空港へ。おつかれさまでした✈️"});
+  }else{
+    lastItems.push({time:"午前", text:"おみやげ探し＆最後のおさんぽ"});
+    lastItems.push({time:"午後", text:"空港へ。おつかれさまでした✈️"});
+  }
   days.push({ label:`${n}日目`, theme:"おみやげ・帰国", items: lastItems });
   return {
     title: `${form.destination} ${form.days}の旅`,
-    lead: `${form.companions}での${form.destination}旅行プランです。`,
+    lead: `${(form.companions && form.companions !== "おまかせ") ? form.companions + "での" : ""}${form.destination}旅行プランです。`,
     days,
     points: [ d.tip,
       "現地の移動は、ホテル発着ツアーや配車アプリを使うとラクです",
@@ -1340,6 +1439,13 @@ function fallbackPlan(form){
 
 /* ---- プラン表示 ---- */
 let lastForm = null;
+/* 画面に差し込む前に、記号をそのまま文字として見せるための変換。
+   利用者の自由入力やAIの返答がそのままHTMLとして解釈されるのを防ぐ */
+function esc(v){
+  return String(v ?? "").replace(/[&<>"']/g, c =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
 function renderPlan(plan, form){
   document.getElementById("s-plan").classList.remove("failed");
   lastForm = form;
@@ -1351,20 +1457,20 @@ function renderPlan(plan, form){
   document.getElementById("pLead").textContent = plan.lead || "";
   document.getElementById("pTags").innerHTML =
     [`${FLAG[form.destination]||"✈️"} ${form.destination}`, form.days, `${form.people}`, form.companions, `予算 ${form.budget}`]
-    .map(t=>`<span>${t}</span>`).join("");
+    .map(t=>`<span>${esc(t)}</span>`).join("");
   document.getElementById("pDays").innerHTML = (plan.days||[]).map((day,i)=>`
     <div class="day">
       <div class="d-head">
         <div class="d-no"><b>${i+1}</b><small>DAY</small></div>
-        <div class="d-t"><b>${day.label||`${i+1}日目`}</b><span>${day.theme||""}</span></div>
+        <div class="d-t"><b>${esc(day.label||`${i+1}日目`)}</b><span>${esc(day.theme||"")}</span></div>
       </div>
       <div class="d-body">${(day.items||[]).map(it=>`
-        <div class="slot"><div class="t"><i>${it.time||""}</i></div><div class="x">${it.text||""}</div></div>`).join("")}
+        <div class="slot"><div class="t"><i>${esc(it.time||"")}</i></div><div class="x">${esc(it.text||"")}</div></div>`).join("")}
       </div>
     </div>`).join("");
   const pts = plan.points || [];
   document.getElementById("pPoints").innerHTML = pts.length
-    ? `<h4>TRAVEL MEMO</h4><ul>${pts.map(p=>`<li>${p}</li>`).join("")}</ul>` : "";
+    ? `<h4>TRAVEL MEMO</h4><ul>${pts.map(p=>`<li>${esc(p)}</li>`).join("")}</ul>` : "";
   show("s-plan");
 }
 </script>
